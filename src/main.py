@@ -54,6 +54,8 @@ for idx, row in preprocessed.iterrows():
     ]
     rotacoes.append(rotacoes_lista)
 
+for rotacao in rotacoes:
+    set(rotacao)  
 preprocessed['rotacoes'] = rotacoes
 print(preprocessed.head())
 
@@ -91,5 +93,20 @@ print(len(container), "boxes fit in the container by first fit volume crescente 
 #Hibrida extreme points + wall building
 
 #Otimizar a ordem e a prioridade dos 74 tipos com GA usando o fitnees como EP, WB ou hibrido 
+def melhor_rotacao(rotacoes):
+    best_area = float('inf')
+    for rotacao in rotacoes:
+        best_area = max(best_area, rotacao[0] * rotacao[1]) #area da base
+    return best_area
+
+cromossos = [
+    (
+        idx,
+        preprocessed.loc[idx, 'volume'],
+        melhor_rotacao(preprocessed.loc[idx, 'rotacoes']), preprocessed.loc[idx, 'quantidade']
+    )
+    for idx in preprocessed.index
+]
+print(cromossos[:5])
 
 
