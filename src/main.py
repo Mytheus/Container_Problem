@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-
+import random 
 from extremePoints import ExtremePoints
 from wallBuiding import WallBuilding
 
@@ -62,18 +62,16 @@ for rotacao in rotacoes:
 preprocessed['rotacoes'] = rotacoes
 print(preprocessed.head())
 
-
-#Otimizar a ordem e a prioridade dos 74 tipos com GA usando o fitnees como EP, WB ou hibrido 
 def melhor_rotacao(rotacoes):
-    # Retorna a rotação com maior área de base (L * W)
-    return max(rotacoes, key=lambda r: r[0] * r[1])
+    # Retorna a rotação com menor área de base (L * W)
+    return min(rotacoes, key=lambda r: r[0] * r[1])
 
 # Cria lista de cromossomos
 cromossos = [
     (
         idx,
         row['volume'],
-        melhor_rotacao(row['rotacoes']),  # retorna a tupla (L, W, H)
+        melhor_rotacao(row['rotacoes']),
         row['quantidade']
     )
     for idx, row in preprocessed.iterrows()
@@ -81,13 +79,12 @@ cromossos = [
 
 print(cromossos[:5])
 
-# Preparando lista de boxes para usar no GA ou nas heurísticas
-# Cada item será a melhor rotação da caixa repetida 'quantidade' vezes
+# Preparando lista de boxes para usar no GA
 boxes = []
 for idx, volume, rot, quantidade in cromossos:
-    boxes.extend([rot] * int(quantidade))
+    for _ in range(int(quantidade)):
+        boxes.append((idx, volume, rot)) 
 
-print(f"Total boxes to place: {len(boxes)}")
 print("Example boxes:", boxes[:5])
 
 def fitness(cromossomo, method='EP'):
@@ -97,7 +94,7 @@ def fitness(cromossomo, method='EP'):
         container = WallBuilding(DIMENSIONS)
     # Coloca as caixas na ordem do cromossomo
     for idx in cromossomo:
-        box = boxes[idx]  # agora boxes[idx] existe
+        box = boxes[idx]  
         if method == 'EP':
             container.place_box(box)
         elif method == 'WB':
@@ -106,18 +103,17 @@ def fitness(cromossomo, method='EP'):
         return sum(b[1][0]*b[1][1]*b[1][2] for b in container.boxes)/VOLUME_CONTAINER
     elif method == 'WB':
         return sum(b[0]*b[1]*b[2] for layer in container.layers for b in layer)/VOLUME_CONTAINER
-    
-#AG 
-import random
+
 
 # --- Parâmetros do GA ---
-POP_SIZE = 50          # Número de indivíduos na população
-GENERATIONS = 100      # Número de gerações
-ELITISM = 0.2          # Percentual de elite a ser mantida
-MUTATION_RATE = 0.1    # Probabilidade de mutação
-METHOD = 'EP'          # EP, WB ou 'Hibrido' se implementar
+POP_SIZE = 8467       #qntd de caixas q cabem    
+GENERATIONS = 100      
+ELITISM = 0.2          
+MUTATION_RATE = 0.1 
+METHOD = 'EP'          
 
-# Cada indivíduo é uma permutação aleatória dos índices de boxes
+# O cromossomo = "ordem de empacotamento".
+# O conteúdo real (volume, rotação, quantidade) = está guardado em boxes.
 def initialize_population(pop_size, n_boxes):
     population = []
     for _ in range(pop_size):
@@ -126,7 +122,6 @@ def initialize_population(pop_size, n_boxes):
         population.append(cromossomo)
     return population
 
-# --- Avaliação do fitness ---
 def evaluate_population(population, method=METHOD):
     fitness_values = []
     for crom in population:
@@ -134,14 +129,12 @@ def evaluate_population(population, method=METHOD):
         fitness_values.append(f)
     return fitness_values
 
-# --- Seleção por elitismo ---
 def select_elite(population, fitness_values, elitism_rate=ELITISM):
     n_elite = max(1, int(len(population) * elitism_rate))
-    # Ordena população pelo fitness (decrescente)
+    # Ordena população pelo fitness (decrescente) 
     sorted_pop = [x for _, x in sorted(zip(fitness_values, population), reverse=True)]
     return sorted_pop[:n_elite]
 
-# --- Crossover (Order Crossover simples) ---
 def crossover(parent1, parent2):
     size = len(parent1)
     a, b = sorted(random.sample(range(size), 2))
@@ -156,14 +149,12 @@ def crossover(parent1, parent2):
             fill_pos += 1
     return child
 
-# --- Mutação (swap de dois genes) ---
 def mutate(cromossomo, mutation_rate=MUTATION_RATE):
     if random.random() < mutation_rate:
         a, b = random.sample(range(len(cromossomo)), 2)
         cromossomo[a], cromossomo[b] = cromossomo[b], cromossomo[a]
     return cromossomo
 
-# --- Geração da nova população ---
 def next_generation(population, fitness_values):
     new_pop = select_elite(population, fitness_values)  # mantém a elite
     while len(new_pop) < len(population):
