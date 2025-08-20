@@ -66,47 +66,28 @@ def melhor_rotacao(rotacoes):
     # Retorna a rotação com menor área de base (L * W)
     return min(rotacoes, key=lambda r: r[0] * r[1])
 
-# Cria lista de cromossomos
-cromossos = [
-    (
-        idx,
-        row['volume'],
-        melhor_rotacao(row['rotacoes']),
-        row['quantidade']
-    )
-    for idx, row in preprocessed.iterrows()
-]
+genes = []
+for idx, row in preprocessed.iterrows():
+    rot = melhor_rotacao(row['rotacoes'])
+    for _ in range(int(row['quantidade'])):
+        genes.append( (idx, float(row['volume']), rot) )
 
-print(cromossos[:5])
+        
 
-# Preparando lista de boxes para usar no GA
-boxes = []
-for idx, volume, rot, quantidade in cromossos:
-    for _ in range(int(quantidade)):
-        boxes.append((idx, volume, rot)) 
-
-print("Example boxes:", boxes[:5])
-
-def fitness(cromossomo, method='EP'):
+def fitness(order, method='EP'):
+    # Inicializa heurística
     if method == 'EP':
         container = ExtremePoints(DIMENSIONS)
     elif method == 'WB':
         container = WallBuilding(DIMENSIONS)
-    # Coloca as caixas na ordem do cromossomo
-    for idx in cromossomo:
-        box = boxes[idx]  
-        if method == 'EP':
-            container.place_box(box)
-        elif method == 'WB':
-            container.build_layer([box])
-    if method == 'EP':
-        return sum(b[1][0]*b[1][1]*b[1][2] for b in container.boxes)/VOLUME_CONTAINER
-    elif method == 'WB':
-        return sum(b[0]*b[1]*b[2] for layer in container.layers for b in layer)/VOLUME_CONTAINER
+    else:
+        raise ValueError("method must be 'EP' or 'WB'")
+
+    return container.utilization() / VOLUME_CONTAINER
 
 
 # --- Parâmetros do GA ---
-POP_SIZE = 8467       #qntd de caixas q cabem    
+POP_SIZE = 200    
 GENERATIONS = 100      
 ELITISM = 0.2          
 MUTATION_RATE = 0.1 
@@ -131,8 +112,8 @@ def evaluate_population(population, method=METHOD):
 
 def select_elite(population, fitness_values, elitism_rate=ELITISM):
     n_elite = max(1, int(len(population) * elitism_rate))
-    # Ordena população pelo fitness (decrescente) 
-    sorted_pop = [x for _, x in sorted(zip(fitness_values, population), reverse=True)]
+    # Ordena população pelo fitness (crescente) 
+    sorted_pop = [x for _, x in sorted(zip(fitness_values, population), reverse=False)]
     return sorted_pop[:n_elite]
 
 def crossover(parent1, parent2):
@@ -182,7 +163,7 @@ def run_ga(boxes, generations=GENERATIONS):
 
     return best_solution, best_fitness
 
-best_cromossomo, best_fit = run_ga(boxes)
+best_cromossomo, best_fit = run_ga(genes)
 print("\nMelhor solução encontrada:")
 print(best_cromossomo)
 print(f"Fitness: {best_fit:.4f}")
