@@ -94,11 +94,11 @@ MUTATION_RATE = 0.1
 METHOD = 'EP'          
 
 # O cromossomo = "ordem de empacotamento".
-# O conteúdo real (volume, rotação, quantidade) = está guardado em boxes.
-def initialize_population(pop_size, n_boxes):
+# O conteúdo real (volume, rotação, quantidade) = está guardado em genes.
+def initialize_population(pop_size, n_genes):
     population = []
     for _ in range(pop_size):
-        cromossomo = list(range(n_boxes))
+        cromossomo = list(range(n_genes))
         random.shuffle(cromossomo)
         population.append(cromossomo)
     return population
