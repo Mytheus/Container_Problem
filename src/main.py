@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 
+from extremePoints import ExtremePoints
+from wallBuiding import WallBuilding
+
 PATH = "data/caixas.csv"
 #comprimento, largura , altura
 DIMENSIONS= (600, 260, 244)
@@ -59,98 +62,6 @@ for rotacao in rotacoes:
 preprocessed['rotacoes'] = rotacoes
 print(preprocessed.head())
 
-#Testando varias abordagens
-#First fit por volume decreasing 
-container = []
-volume_container = VOLUME_CONTAINER
-for idx, row in preprocessed.sort_values('volume', ascending=False).iterrows():
-    volume =row['volume']
-    quantidade = int(row['quantidade'])
-    while quantidade > 0 and volume <= volume_container:
-        quantidade -= 1
-        volume_container -= volume
-        container.append((idx, volume))
-        print(f"Added box {idx} with volume {volume}, remaining volume in container: {volume_container}")
-print(len(container), "boxes fit in the container by first fit volume approach")
-
-#First fit por volume crescente
-container = []
-volume_container = VOLUME_CONTAINER
-for idx, row in preprocessed.sort_values('volume', ascending=True).iterrows():
-    volume =row['volume']
-    quantidade = int(row['quantidade'])
-    while quantidade > 0 and volume <= volume_container:
-        quantidade -= 1
-        volume_container -= volume
-        container.append((idx, volume))
-        print(f"Added box {idx} with volume {volume}, remaining volume in container: {volume_container}")
-print(len(container), "boxes fit in the container by first fit volume crescente approach. com volume = ", volume)
-
-#Extreme points
-class ExtremePoints:
-    def __init__(self, container_dim):
-        self.container = container_dim  # (L, W, H)
-        self.points = [(0,0,0)]        # pontos livres
-        self.boxes = []                # caixas já colocadas
-
-    def fits(self, point, box):
-        x, y, z = point
-        L, W, H = box
-        # Verifica se ultrapassa o container
-        if x + L > self.container[0] or y + W > self.container[1] or z + H > self.container[2]:
-            return False
-        # Verifica colisão com caixas já colocadas
-        for (px, py, pz), (bL, bW, bH) in self.boxes:
-            if (x < px + bL and x + L > px and
-                y < py + bW and y + W > py and
-                z < pz + bH and z + H > pz):
-                return False
-        return True
-
-    def update_points(self, point, box):
-        # Adiciona novos pontos extremos gerados pela caixa colocada
-        x, y, z = point
-        L, W, H = box
-        new_points = [
-            (x + L, y, z),
-            (x, y + W, z),
-            (x, y, z + H)
-        ]
-        # Só adiciona pontos que cabem no container
-        for px, py, pz in new_points:
-            if px <= self.container[0] and py <= self.container[1] and pz <= self.container[2]:
-                self.points.append((px, py, pz))
-        # Remove o ponto onde colocamos a caixa
-        if point in self.points:
-            self.points.remove(point)
-
-    def place_box(self, box):
-        for point in self.points:
-            if self.fits(point, box):
-                self.boxes.append((point, box))
-                self.update_points(point, box)
-                return True
-        return False
-
-    def utilization(self):
-        # Retorna o volume usado do container
-        return sum(b[1][0]*b[1][1]*b[1][2] for b in self.boxes)
-
-#Wall building
-class WallBuilding:
-    def __init__(self, container_dim):
-        self.container = container_dim
-        self.layers = []
-
-    def build_layer(self, boxes):
-        layer = []
-        width_used = 0
-        for box in boxes:
-            if width_used + box[0] <= self.container[0]:
-                layer.append(box)
-                width_used += box[0]
-        self.layers.append(layer)
-#Hibrida extreme points + wall building
 
 #Otimizar a ordem e a prioridade dos 74 tipos com GA usando o fitnees como EP, WB ou hibrido 
 def melhor_rotacao(rotacoes):
@@ -175,6 +86,9 @@ print(cromossos[:5])
 boxes = []
 for idx, volume, rot, quantidade in cromossos:
     boxes.extend([rot] * int(quantidade))
+
+print(f"Total boxes to place: {len(boxes)}")
+print("Example boxes:", boxes[:5])
 
 def fitness(cromossomo, method='EP'):
     if method == 'EP':
@@ -203,7 +117,6 @@ ELITISM = 0.2          # Percentual de elite a ser mantida
 MUTATION_RATE = 0.1    # Probabilidade de mutação
 METHOD = 'EP'          # EP, WB ou 'Hibrido' se implementar
 
-# --- Inicialização da população ---
 # Cada indivíduo é uma permutação aleatória dos índices de boxes
 def initialize_population(pop_size, n_boxes):
     population = []
@@ -261,7 +174,7 @@ def next_generation(population, fitness_values):
         new_pop.append(child)
     return new_pop
 
-# --- Loop principal do GA ---
+#GA
 def run_ga(boxes, generations=GENERATIONS):
     population = initialize_population(POP_SIZE, len(boxes))
     best_solution = None
